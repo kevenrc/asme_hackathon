@@ -64,23 +64,23 @@ def execute_generational_steps():
 
     if rank == 0:
 
-        filenames = ['bridgeport1week1-train.csv', 'bridgeport1week2-train.csv']
-	df1 = pd.read_csv(filenames[0])
-	df2 = pd.read_csv(filenames[1])
+        filenames = ['data/bridgeport1week1-train_clean.csv', 'data/bridgeport1week2-train_clean.csv']
+        df1 = pd.read_csv(filenames[0])
+        df2 = pd.read_csv(filenames[1])
 
-	df = df1.append(df2)
+        df = df1.append(df2)
 
-	train, test = train_test_split(df, test_size = 0.2, random_seed=42)
+        train, test = train_test_split(df, test_size = 0.2, random_state=42)
 
-	columns = df.columns
-	x = train.loc[:, ~columns.str.contains('Damage')]
-	x = x.loc[:, :-1].values
+        columns = df.columns
+        x = train.loc[:, ~columns.str.contains('Damage')]
+        x = x.iloc[:, 1:].values
 
-	y = train.loc[:, columns.str.contains('Damage')]
-	y = y.iloc[:, 0].values.reshape((-1,1))
+        y = train.loc[:, columns.str.contains('Damage')]
+        y = y.iloc[:, 0].values.reshape((-1,1))
 
 
-    x = PI.COMM_WORLD.bcast(x, root=0)
+    x = MPI.COMM_WORLD.bcast(x, root=0)
     y = MPI.COMM_WORLD.bcast(y, root=0)
 
     training_data = ExplicitTrainingData(x, y)

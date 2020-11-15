@@ -53,10 +53,41 @@ class DataLoader():
         return array[idx]
      
 
+def parse_variable(var_name):
+    names = var_name.split(' > ')
+    if 'Y' in names[-2]:
+        names[3] = 'Y'
+    elif 'X' in names[-2]:
+        names[3] = 'X'
+    else:
+        return 'Battery Voltage', names[1]
+
+    machine = names[1]
+    new_name = ''.join([names[3], '_', names[4]])
+
+    return new_name, machine
+
+def change_column_names(df):
+    names = []
+    columns = df.columns
+    for name in columns:
+        if name == 'Time':
+            names.append(name)
+        else:
+            new_name, machine = parse_variable(name)
+            names.append(new_name)
+    df.columns = names
+    df['Machine'] = machine
+    return df
+
 if __name__ == "__main__":
-    filenames = glob.glob('data/*test.csv')
-    for filename in filenames:
-        print(filename)
-        data = DataLoader(filename)
-        print(data.data.shape)
-        data.data.to_csv(''.join([filename.replace('.csv', ''), '_clean.csv']), index=False)
+    filenames = glob.glob('data/*train_clean.csv')
+    df = pd.read_csv(filenames[0])
+    df = change_column_names(df)
+    for filename in filenames[1:]:
+        new_df = pd.read_csv(filename)
+        new_df = change_column_names(new_df)
+        df = df.append(new_df)
+
+    df.to_csv('combined_clean_data.csv', index=False)
+
