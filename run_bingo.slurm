@@ -5,7 +5,9 @@
 #SBATCH --ntasks=1 # number of MPI tasks, abbreviated by -n # additional information for allocated clusters
 #SBATCH --account=hochhalter-np # account - abbreviated by -A
 #SBATCH --partition=hochhalter-shared-np # partition, abbreviated by -p # # set data and working directories
+#SABTCH --qos=hochhalter-high-np
 #SBATCH --gres=gpu:v100:2
+#SBATCH --nodelist=notch204
 #
 # set data and working directories
 export WORKDIR=/uufs/chpc.utah.edu/common/home/u0823391/Desktop/asme_hackathon

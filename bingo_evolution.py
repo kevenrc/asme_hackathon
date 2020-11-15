@@ -23,13 +23,11 @@ from bingo.evolutionary_optimizers.fitness_predictor_island import FitnessPredic
 from bingo.local_optimizers.continuous_local_opt import ContinuousLocalOptimization
 from bingo.stats.pareto_front import ParetoFront
 
-from preprocess_bridgeport import DataLoader
-
-POP_SIZE = 300
-STACK_SIZE = 320
-MAX_GENERATIONS = 200000
+POP_SIZE = 100
+STACK_SIZE = 64
+MAX_GENERATIONS = 20000
 FITNESS_THRESHOLD = 1e-4
-CHECK_FREQUENCY = 10000
+CHECK_FREQUENCY = 1000
 MIN_GENERATIONS = 100
 CROSSOVER_PROBABILITY = 0.6
 MUTATION_PROBABILITY = 0.3
@@ -66,11 +64,21 @@ def execute_generational_steps():
 
     if rank == 0:
 
-        filename = 'bridgeport1week1-train.csv'
-        data = DataLoader(filename)
+        filenames = ['bridgeport1week1-train.csv', 'bridgeport1week2-train.csv']
+	df1 = pd.read_csv(filenames[0])
+	df2 = pd.read_csv(filenames[1])
 
-        x = data.feature_values.values
-        y = data.label_values.iloc[:, 0].values.reshape((-1, 1))
+	df = df1.append(df2)
+
+	train, test = train_test_split(df, test_size = 0.2, random_seed=42)
+
+	columns = df.columns
+	x = train.loc[:, ~columns.str.contains('Damage')]
+	x = x.loc[:, :-1].values
+
+	y = train.loc[:, columns.str.contains('Damage')]
+	y = y.iloc[:, 0].values.reshape((-1,1))
+
 
     x = PI.COMM_WORLD.bcast(x, root=0)
     y = MPI.COMM_WORLD.bcast(y, root=0)
@@ -82,18 +90,18 @@ def execute_generational_steps():
     component_generator.add_operator(3) # -
     component_generator.add_operator(4) # *
     component_generator.add_operator(5) # /
-    component_generator.add_operator(6) # sin
-    component_generator.add_operator(7) # cos
+#    component_generator.add_operator(6) # sin
+#    component_generator.add_operator(7) # cos
 #    component_generator.add_operator(8) # exponential
-    component_generator.add_operator(10) # power
-    component_generator.add_operator(12) # sqrt
+#    component_generator.add_operator(10) # power
+#    component_generator.add_operator(12) # sqrt
 
     crossover = AGraphCrossover(component_generator)
     mutation = AGraphMutation(component_generator)
 
     agraph_generator = AGraphGenerator(STACK_SIZE, component_generator)
 
-    fitness = ExplicitRegression(training_data=training_data, metric='mean absolute error')
+    fitness = ExplicitRegression(training_data=training_data, metric='mean squared error')
     local_opt_fitness = ContinuousLocalOptimization(fitness, algorithm='lm')
     evaluator = Evaluation(local_opt_fitness)
 
