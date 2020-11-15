@@ -16,7 +16,7 @@ from bingo.symbolic_regression.agraph.generator import AGraphGenerator
 from bingo.symbolic_regression.agraph.component_generator import ComponentGenerator
 from bingo.symbolic_regression.explicit_regression import ExplicitRegression, ExplicitTrainingData
 
-from bingo.evolutionary_algorithms.age_fitness import AgeFitnessEA
+from bingo.evolutionary_algorithms.deterministic_crowding import DeterministicCrowdingEA
 from bingo.evolutionary_optimizers.parallel_archipelago import ParallelArchipelago
 from bingo.evaluation.evaluation import Evaluation
 from bingo.evolutionary_optimizers.fitness_predictor_island import FitnessPredictorIsland
@@ -24,7 +24,7 @@ from bingo.local_optimizers.continuous_local_opt import ContinuousLocalOptimizat
 from bingo.stats.pareto_front import ParetoFront
 
 POP_SIZE = 100
-STACK_SIZE = 64
+STACK_SIZE = 256
 MAX_GENERATIONS = 20000
 FITNESS_THRESHOLD = 1e-4
 CHECK_FREQUENCY = 1000
@@ -64,21 +64,18 @@ def execute_generational_steps():
 
     if rank == 0:
 
-        filenames = ['data/bridgeport1week1-train_clean.csv', 'data/bridgeport1week2-train_clean.csv']
-        df1 = pd.read_csv(filenames[0])
-        df2 = pd.read_csv(filenames[1])
-
-        df = df1.append(df2)
+        df = pd.read_csv('data/combined_clean_data.csv')
+        df = df.dropna()
 
         train, test = train_test_split(df, test_size = 0.2, random_state=42)
 
         columns = df.columns
         x = train.loc[:, ~columns.str.contains('Damage')]
-        x = x.iloc[:, 1:].values
+        x = x.loc[:, x.columns != 'Time']
+        x = x.loc[:, x.columns != 'Machine'].values
 
         y = train.loc[:, columns.str.contains('Damage')]
-        y = y.iloc[:, 0].values.reshape((-1,1))
-
+        y = y.iloc[:, 0].values.reshape((-1,1)) 
 
     x = MPI.COMM_WORLD.bcast(x, root=0)
     y = MPI.COMM_WORLD.bcast(y, root=0)
@@ -105,9 +102,9 @@ def execute_generational_steps():
     local_opt_fitness = ContinuousLocalOptimization(fitness, algorithm='lm')
     evaluator = Evaluation(local_opt_fitness)
 
-    ea = AgeFitnessEA(evaluator, agraph_generator, crossover, mutation, CROSSOVER_PROBABILITY, MUTATION_PROBABILITY, POP_SIZE)
+    ea = DeterministicCrowdingEA(evaluator, crossover, mutation, CROSSOVER_PROBABILITY, MUTATION_PROBABILITY)
 
-    island = FitnessPredictorIsland(ea, agraph_generator, POP_SIZE, predictor_size_ratio=0.1)
+    island = FitnessPredictorIsland(ea, agraph_generator, POP_SIZE, predictor_size_ratio=0.2)
 
     pareto_front = ParetoFront(secondary_key = lambda ag: ag.get_complexity(),
             similarity_function=agraph_similarity)
@@ -116,7 +113,7 @@ def execute_generational_steps():
 
     optim_result = archipelago.evolve_until_convergence(MAX_GENERATIONS, FITNESS_THRESHOLD,
             convergence_check_frequency=CHECK_FREQUENCY, min_generations=MIN_GENERATIONS,
-            checkpoint_base_name='checkpoint', num_checkpoints=20)
+            checkpoint_base_name='checkpoint', num_checkpoints=2)
 
     if optim_result.success:
         if rank == 0:
